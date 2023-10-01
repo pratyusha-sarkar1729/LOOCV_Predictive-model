@@ -144,4 +144,104 @@ mse <- mean((original - mix)^2)
 print(paste("MSE:", mse))
 
 
+estimate_variance <- function(y, X, theta_samples, true_sigma){
+  num_samples <- nrow(theta_samples)
+  num_observations <- length(y)
+  i= 1
+  vector <- numeric()
+  for (i in 1:num_observations) {
+  # Initialize variables
+  weighted_likelihoods <- numeric(num_samples)
+  weights <- numeric(num_samples)
+  all_weighted_likelihoods <- matrix(0, nrow = num_observations, ncol = num_samples)
+
+  for (s in 1:num_samples) {
+    weights[s] <- calculate_weights(y[i], X[i, ], theta_samples[s, ], true_sigma)
+    weighted_likelihoods[s] <- dnorm(y[i], mean = X[i, ] %*% theta_samples[s, ], sd = true_sigma) * weights[s]
+    #all_weighted_likelihoods[s,i] <- mean(weighted_likelihoods)
+  }
+  vector[i] <- mean(weighted_likelihoods)
+  vector[i+num_observations] <- mean(weights)
+  #all_weighted_likelihoods[i] <- mean(weighted_likelihoods[s])
+  #return(all_vector)
+  }
+  return(vector)
+}
+vector_1 <- as.matrix(estimate_variance(y, X, theta_samples, true_sigma))
+dim(vector_1)
+library(mcmcse)
+chain_1_cov <- mcse.multi(vector_1,method = "bm")$cov ## using batch eans estimator
+
+
+# 'delta_g_matrix' is your Δg(x) matrix
+calculate_delta_g_1_matrix <- function(x) {
+  n <- length(x) / 2  # Assuming 'x' is your input vector of length 2n
+  delta_g_1_matrix <- matrix(0, nrow = n, ncol = 2 * n)  # Initialize the result matrix
+  
+  for (i in 1:n) {
+    delta_g_1_matrix[i, i] <- 1 / (x[i + n])
+    delta_g_1_matrix[i, i + n] <- x[i] / ( x[i + n])^2
+  }
+  
+  return(delta_g_1_matrix)
+}
+chain_2_cov <- as.numeric(chain_1_cov) * calculate_delta_g_1_matrix(vector_1) %*% t(calculate_delta_g_1_matrix(vector_1))
+
+calculate_vector_2 <- function(x){
+  n <- length(x) / 2  # Assuming 'x' is your input vector of length 2n
+  g_2_matrix <- matrix(0, nrow = n, ncol =  1)  # Initialize the result matrix
+  #i = 2
+  for (i in 1:n) {
+    g_2_matrix[i, ] <- x[i] / (x[i+n])
+  }
+  
+  return(g_2_matrix)
+}
+vector_2 <- calculate_vector_2(vector_1)
+  
+
+calculate_delta_g_2_matrix <- function(x) {
+  n <- length(x)   # Assuming 'x' is your input vector of length 2n
+  delta_g_2_matrix <- matrix(0, nrow = n, ncol =  n)  # Initialize the result matrix
+  
+  for (i in 1:n) {
+    delta_g_2_matrix[i, i] <- 1 / (x[i])
+  }
+  
+  return(delta_g_2_matrix)
+}
+
+chain_3_cov <- (chain_2_cov) %*% calculate_delta_g_2_matrix(vector_2) %*% (chain_2_cov) %*% t(calculate_delta_g_2_matrix(vector_2))
+
+calculate_vector_3 <- function(x){
+  n <- length(x)  # Assuming 'x' is your input vector of length 2n
+  g_3_matrix <- matrix(0, nrow = n, ncol =  1)  # Initialize the result matrix
+  #i = 2
+  for (i in 1:n) {
+    g_3_matrix[i, ] <- log(x[i])
+  }
+  
+  return(g_3_matrix)
+}
+vector_3 <- calculate_vector_3(vector_2)
+
+calculate_delta_g_3_matrix <- function(x) {
+  n <- length(x)   # Assuming 'x' is your input vector of length 2n
+  delta_g_3_matrix <- matrix(0, nrow = 1, ncol =  n)  # Initialize the result matrix
+  
+  for (i in 1:n) {
+    delta_g_3_matrix[, i] <- 1
+  }
+  return(delta_g_3_matrix)
+}
+
+chain_4_cov <-  calculate_delta_g_3_matrix(vector_3) %*%(chain_3_cov) %*% t(calculate_delta_g_3_matrix(vector_3))
+
+print(paste("Final estimate of Variance is: ",round(chain_4_cov,4)))
+
+
+
+
+
+
 
