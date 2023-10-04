@@ -103,7 +103,7 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, true_sigma) {
     #s =1
     for (s in 1:num_samples) {
       weights[s,] <- calculate_weights(y, X, t(theta_samples[s,]), true_sigma)
-      weighted_likelihoods[s,] <- dnorm(y, mean = X %*% as.matrix(theta_samples[s, ]), sd = true_sigma,log = TRUE) * weights[s]
+      weighted_likelihoods[s,] <- -dnorm(y, mean = X %*% as.matrix(theta_samples[s, ],log= TRUE), sd = true_sigma,log = TRUE) * weights[s]
     }
     
     # Store the weighted_likelihoods for this observation in the matrix
@@ -123,7 +123,7 @@ chain_1_cov <- mcse.multi(vector_1,method = "bm")$cov ## using batch eans estima
 
 vec_1_sum <- numeric()
 for (i in 1:num_observations) {
-  vec_1_sum[i] <- sum(vector_1[num_samples,i])
+  vec_1_sum[i] <- sum(vector_1[,i])
 }
 
 # 'delta_g_matrix' is your Δg(x) matrix
