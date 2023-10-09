@@ -1,5 +1,19 @@
 library(mvtnorm)
 
+# Example:
+set.seed(1)
+N <- 50
+X <- matrix(rnorm(N * 25), ncol = 25)
+true_theta <- (rep(0.2, 25))
+true_sigma <- 2
+y <- rnorm(N, as.vector(X %*% matrix(true_theta, ncol = 1)), true_sigma)
+theta_0 <- as.matrix(rep(0, 25))
+Sigma <- diag(25)
+num_samples <- 500
+initial_theta <- rep(0.1, 25)
+s.cand <- 0.008
+
+
 # Function to calculate the posterior log probability p(theta|y)
 calculate_posterior_log <- function(y, X, true_theta, sigma, theta_0, Sigma) {
   likelihood <- -dmvnorm(y, mean = X %*% true_theta, sigma = sigma,log = TRUE)
@@ -53,18 +67,7 @@ theta_samples_from_combined_posterior <- function(y, X, num_samples, theta_0, Si
   return(samples)
 }
 
-# Example usage:
-set.seed(1)
-N <- 50
-X <- matrix(rnorm(N * 25), ncol = 25)
-true_theta <- (rep(0.2, 25))
-true_sigma <- 2
-y <- rnorm(N, as.vector(X %*% matrix(true_theta, ncol = 1)), true_sigma)
-theta_0 <- as.matrix(rep(0, 25))
-Sigma <- diag(25)
-num_samples <- 500
-initial_theta <- rep(0.1, 25)
-s.cand <- 0.008
+
 theta_samples <- theta_samples_from_combined_posterior(y, X, num_samples, initial_theta, Sigma, true_sigma*diag(length(y)), s.cand)
 theta_samples
 dim(theta_samples)
@@ -72,15 +75,7 @@ length(unique(theta_samples[,1])) / nrow(theta_samples)
 # Assuming you have theta_samples matrix with num_samples rows and num_parameters columns
 # Assuming you have theta_samples matrix with num_samples rows and num_parameters columns
 
-# Increase the plot margin size to avoid the "figure margins too large" error
-par(mar = c(5, 4, 4, 2))  # Adjust the margin values as needed
-num_parameters <- length(theta_0)
-# Plot trace plots for each parameter
-par(mfrow = c(num_parameters, 1))
-i = 1
-for (i in 1:num_parameters) {
-  plot(theta_samples[, i], type = 'l', col = 'blue', xlab = 'Iteration', ylab = paste('Theta[', i, ']', sep = ''), main = paste('Trace Plot for Theta[', i, ']', sep = ''))
-}
+
 
 
 
@@ -107,7 +102,7 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, sigma) {
     s =20
     for (s in 1:num_samples) {
       weights[s,] <- calculate_weights(y, X, t(theta_samples[s,]), true_sigma)
-      weighted_likelihoods[s,] <- -(dmvnorm((y), mean = X %*% (theta_samples[s, ]), sigma = diag(length(y)),log = TRUE)) + log(weights[s,])
+      weighted_likelihoods[s,] <- -(dmvnorm((y), mean = X %*% (theta_samples[s, ]), sigma = sigma,log = TRUE)) + log(weights[s,])
     }
     
     # Store the weighted_likelihoods for this observation in the matrix
