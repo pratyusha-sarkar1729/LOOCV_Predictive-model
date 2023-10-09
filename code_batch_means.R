@@ -2,32 +2,38 @@ library(mvtnorm)
 
 # Function to calculate the posterior log probability p(theta|y)
 calculate_posterior_log <- function(y, X, true_theta, sigma, theta_0, Sigma) {
-  likelihood <- sum(log(dnorm(y, mean = X %*% true_theta, sd = sigma)))
-  prior <- dmvnorm(true_theta, mean = theta_0, sigma = Sigma, log = TRUE)
+  likelihood <- -dmvnorm(y, mean = X %*% true_theta, sigma = sigma,log = TRUE)
+  prior <- -dmvnorm(true_theta, mean = theta_0, sigma = Sigma, log = TRUE)
   posterior <- likelihood + prior
   return(posterior)
 }
+calculate_posterior_log(y,X,true_theta,true_sigma*diag(length(y)),theta_0,Sigma)
+sigma = true_sigma*diag(length(y))
 
 # Function to calculate the inverse likelihood (1 / p(y|theta))
 calculate_inverse_likelihood <- function(y, X, true_theta, sigma) {
-  inverse_likelihood <- 1 / dnorm(y, mean = X %*% true_theta, sd = sigma)
+  inverse_likelihood <- 1 / -dmvnorm(y, mean = X %*% true_theta, sigma = sigma,log = TRUE)
   return(inverse_likelihood)
 }
+calculate_inverse_likelihood(y,X,true_theta,true_sigma*diag(length(y)))
+
 
 # Function to calculate the combined posterior log probability p(theta|y) * sum(1 / p(y|theta))
 calculate_combined_posterior_log <- function(y, X, true_theta, sigma, theta_0, Sigma) {
   posterior_log <- calculate_posterior_log(y, X, true_theta, sigma, theta_0, Sigma)
   inverse_likelihood_sum <- sum(calculate_inverse_likelihood(y, X, true_theta, sigma))
-  combined_posterior_log <- posterior_log + log(inverse_likelihood_sum)
+  combined_posterior_log <- posterior_log + (inverse_likelihood_sum)
   return(combined_posterior_log)
 }
+calculate_combined_posterior_log(y,X,true_theta,true_sigma*diag(length(y)),theta_0,Sigma)
+
 
 # Function to draw samples from the combined posterior using Metropolis-Hastings
 theta_samples_from_combined_posterior <- function(y, X, num_samples, theta_0, Sigma, sigma, s.cand) {
   num_parameters <- length(theta_0)
   samples <- matrix(0, nrow = num_samples, ncol = num_parameters)
   current_theta <- theta_0
-  
+  #s = 1
   for (s in 1:num_samples) {
     proposal_theta <- as.vector(rmvnorm(1, mean = current_theta, sigma = s.cand * diag(num_parameters)))
     
@@ -37,7 +43,7 @@ theta_samples_from_combined_posterior <- function(y, X, num_samples, theta_0, Si
     
     log_ratio <- combined_posterior_proposal_log - combined_posterior_current_log
     
-    if (!is.na(log_ratio) && log(runif(1)) < log_ratio) {
+    if ( !is.na(log_ratio) && log(runif(1)) < log_ratio) {
       current_theta <- proposal_theta
     }
     
@@ -51,48 +57,46 @@ theta_samples_from_combined_posterior <- function(y, X, num_samples, theta_0, Si
 set.seed(1)
 N <- 50
 X <- matrix(rnorm(N * 25), ncol = 25)
-true_theta <- as.matrix(rep(0.2, 25))
-true_sigma <- 1
+true_theta <- (rep(0.2, 25))
+true_sigma <- 2
 y <- rnorm(N, as.vector(X %*% matrix(true_theta, ncol = 1)), true_sigma)
 theta_0 <- as.matrix(rep(0, 25))
 Sigma <- diag(25)
-num_samples <- 400
+num_samples <- 500
 initial_theta <- rep(0.1, 25)
-s.cand <- 0.002
-theta_samples <- theta_samples_from_combined_posterior(y, X, num_samples, initial_theta, Sigma, true_sigma, s.cand)
+s.cand <- 0.008
+theta_samples <- theta_samples_from_combined_posterior(y, X, num_samples, initial_theta, Sigma, true_sigma*diag(length(y)), s.cand)
+theta_samples
 dim(theta_samples)
+length(unique(theta_samples[,1])) / nrow(theta_samples)
+# Assuming you have theta_samples matrix with num_samples rows and num_parameters columns
+# Assuming you have theta_samples matrix with num_samples rows and num_parameters columns
+
+# Increase the plot margin size to avoid the "figure margins too large" error
+par(mar = c(5, 4, 4, 2))  # Adjust the margin values as needed
+num_parameters <- length(theta_0)
+# Plot trace plots for each parameter
+par(mfrow = c(num_parameters, 1))
+i = 1
+for (i in 1:num_parameters) {
+  plot(theta_samples[, i], type = 'l', col = 'blue', xlab = 'Iteration', ylab = paste('Theta[', i, ']', sep = ''), main = paste('Trace Plot for Theta[', i, ']', sep = ''))
+}
+
+
 
 # Function to calculate weights for each data point
 calculate_weights <- function(y, X, true_theta, true_sigma) {
   inverse_likelihoods <- numeric(0)
   
   for(i in 1: length(y)){
-    inverse_likelihoods[i] <- 1 / dnorm(y[i], mean = X[i,] %*% true_theta, sd = true_sigma,log = TRUE)
+    inverse_likelihoods[i] <-  -(1 / dnorm(y[i], mean = X[i,] %*% true_theta, sd = true_sigma,log = TRUE))
   }
   weights <- inverse_likelihoods / sum(inverse_likelihoods)
   return(weights)
 }
 
-estimate_variance <- function(y, X, theta_samples, true_sigma){
-  num_samples <- nrow(theta_samples)
-  num_observations <- length(y)
-  i= 1
-  vector <- numeric()
-  for (i in 1:num_observations) {
-    # Initialize variables
-    weighted_likelihoods <- numeric(num_samples)
-    weights <- numeric(num_samples)
 
-    for (s in 1:num_samples) {
-      weights[s] <- calculate_weights(y[i], X[i, ], theta_samples[s, ], true_sigma)
-      weighted_likelihoods[s] <- dnorm(y[i], mean = X[i, ] %*% theta_samples[s, ], sd = true_sigma) * weights[s]
-    }
-    
-  }
-  return(vector)
-}
-
-calculate_weighted_likelihoods <- function(y, X, theta_samples, true_sigma) {
+calculate_weighted_likelihoods <- function(y, X, theta_samples, sigma) {
   num_samples <- nrow(theta_samples)
   num_observations <- length(y)
   #i= 100
@@ -100,10 +104,10 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, true_sigma) {
   
     weighted_likelihoods <- matrix(0,num_samples,num_observations)
     weights <- matrix(0,num_samples,num_observations)
-    #s =1
+    s =20
     for (s in 1:num_samples) {
       weights[s,] <- calculate_weights(y, X, t(theta_samples[s,]), true_sigma)
-      weighted_likelihoods[s,] <- -dnorm(y, mean = X %*% as.matrix(theta_samples[s, ],log= TRUE), sd = true_sigma,log = TRUE) * weights[s]
+      weighted_likelihoods[s,] <- -(dmvnorm((y), mean = X %*% (theta_samples[s, ]), sigma = diag(length(y)),log = TRUE)) + log(weights[s,])
     }
     
     # Store the weighted_likelihoods for this observation in the matrix
@@ -114,15 +118,17 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, true_sigma) {
 
 # Example usage:
 # Assuming you have y, X, theta_samples, and true_sigma defined
-weighted_likelihoods_matrix <- calculate_weighted_likelihoods(y, X, theta_samples, true_sigma)
+weighted_likelihoods_matrix <- calculate_weighted_likelihoods(y, X, theta_samples, true_sigma*diag(length(y)))
 
 vector_1 <- weighted_likelihoods_matrix
 dim(vector_1)
+
 library(mcmcse)
-chain_1_cov <- mcse.multi(vector_1,method = "bm")$cov ## using batch eans estimator
+library(coda)
+chain_1_cov <- mcse.multi(vector_1,method = "bm")$cov ## using batch means estimator
 
 vec_1_sum <- numeric()
-for (i in 1:num_observations) {
+for (i in 1:(2*num_observations)) {
   vec_1_sum[i] <- sum(vector_1[,i])
 }
 
@@ -192,4 +198,5 @@ calculate_delta_g_3_matrix <- function(x) {
 chain_4_cov <-  calculate_delta_g_3_matrix(vector_3) %*%(chain_3_cov) %*% t(calculate_delta_g_3_matrix(vector_3))
 
 print(paste("Final estimate of Variance is: ",round(chain_4_cov,4)))
+
 
