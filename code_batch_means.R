@@ -22,28 +22,29 @@ calculate_posterior_log <- function(y, X, true_theta, sigma, theta_0, Sigma) {
   return(posterior)
 }
 calculate_posterior_log(y,X,true_theta,true_sigma*diag(length(y)),theta_0,Sigma)
-sigma = true_sigma*diag(length(y))
+#sigma = true_sigma*diag(length(y))
 
 # Function to calculate the inverse likelihood (1 / p(y|theta))
 calculate_inverse_likelihood <- function(y, X, true_theta, sigma) {
-  inverse_likelihood <- numeric()
+  inverse_likelihood <- numeric(length(y))
   for (i in 1:length(y)) {
-    inverse_likelihood[i] <- -(1 / dnorm(y[i], mean = X[i,] %*% true_theta, sd = sigma,log = TRUE))
+    inverse_likelihood[i] <- (1 / dnorm(y[i], mean = X[i,] %*% true_theta, sd = sigma))
     
   }
   return(inverse_likelihood)
 }
-calculate_inverse_likelihood(y,X,true_theta,true_sigma*diag(length(y)))
+calculate_inverse_likelihood(y,X,true_theta, true_sigma)
 
 
 # Function to calculate the combined posterior log probability p(theta|y) * sum(1 / p(y|theta))
-calculate_combined_posterior_log <- function(y, X, true_theta, sigma, theta_0, Sigma) {
-  posterior_log <- calculate_posterior_log(y, X, true_theta, sigma, theta_0, Sigma)
+calculate_combined_posterior_log <- function(y, X, true_theta, sigma, theta_0, Sigma) 
+{
+  posterior_log <- calculate_posterior_log(y, X, true_theta, sigma*diag(length(y)), theta_0, Sigma)
   inverse_likelihood_sum <- sum(calculate_inverse_likelihood(y, X, true_theta, sigma))
-  combined_posterior_log <- posterior_log + (inverse_likelihood_sum)
+  combined_posterior_log <- posterior_log + log(inverse_likelihood_sum)
   return(combined_posterior_log)
 }
-calculate_combined_posterior_log(y,X,true_theta,true_sigma*diag(length(y)),theta_0,Sigma)
+calculate_combined_posterior_log(y,X,true_theta,true_sigma,theta_0,Sigma)
 
 
 # Function to draw samples from the combined posterior using Metropolis-Hastings
@@ -53,7 +54,7 @@ theta_samples_from_combined_posterior <- function(y, X, num_samples, theta_0, Si
   current_theta <- theta_0
   #s = 1
   for (s in 1:num_samples) {
-    proposal_theta <- as.vector(rmvnorm(1, mean = current_theta, sigma = s.cand * diag(num_parameters)))
+    proposal_theta <- as.numeric(rmvnorm(1, mean = current_theta, sigma = s.cand * diag(num_parameters)))
     
     # Calculate the Metropolis-Hastings acceptance ratio in log space
     combined_posterior_current_log <- calculate_combined_posterior_log(y, X, current_theta, sigma, theta_0, Sigma)
@@ -61,7 +62,7 @@ theta_samples_from_combined_posterior <- function(y, X, num_samples, theta_0, Si
     
     log_ratio <- combined_posterior_proposal_log - combined_posterior_current_log
     
-    if ( !is.na(log_ratio) && log(runif(1)) < log_ratio) {
+    if (log(runif(1)) < log_ratio) {
       current_theta <- proposal_theta
     }
     
@@ -72,7 +73,7 @@ theta_samples_from_combined_posterior <- function(y, X, num_samples, theta_0, Si
 }
 
 
-theta_samples <- theta_samples_from_combined_posterior(y, X, num_samples, initial_theta, Sigma, true_sigma*diag(length(y)), s.cand)
+theta_samples <- theta_samples_from_combined_posterior(y, X, num_samples, initial_theta, Sigma, true_sigma, s.cand)
 theta_samples
 dim(theta_samples)
 length(unique(theta_samples[,1])) / nrow(theta_samples)
@@ -88,7 +89,7 @@ calculate_weights <- function(y, X, true_theta, true_sigma) {
   inverse_likelihoods <- numeric(0)
   
   for(i in 1: length(y)){
-    inverse_likelihoods[i] <-  -(1 / dnorm(y[i], mean = X[i,] %*% true_theta, sd = true_sigma,log = TRUE))
+    inverse_likelihoods[i] <-  (1 / dnorm(y[i], mean = X[i,] %*% true_theta, sd = true_sigma))
   }
   weights <- inverse_likelihoods / sum(inverse_likelihoods)
   return(weights)
@@ -105,8 +106,8 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, sigma) {
     weights <- matrix(0,num_samples,num_observations)
     #s =20
     for (s in 1:num_samples) {
-      weights[s,] <- calculate_weights(y, X, t(theta_samples[s,]), true_sigma)
-      weighted_likelihoods[s,] <- -(dmvnorm((y), mean = X %*% (theta_samples[s, ]), sigma = sigma,log = TRUE)) + log(weights[s,])
+      weights[s,] <- calculate_weights(y, X, theta_samples[s,], true_sigma)
+      weighted_likelihoods[s,] <- -(dmvnorm((y), mean = as.numeric(X %*% (theta_samples[s, ])), sigma = sigma*diag(length(y)),log = TRUE)) + log(weights[s,])
     }
     
     # Store the weighted_likelihoods for this observation in the matrix
@@ -117,7 +118,7 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, sigma) {
 
 # Example usage:
 # Assuming you have y, X, theta_samples, and true_sigma defined
-weighted_likelihoods_matrix <- calculate_weighted_likelihoods(y, X, theta_samples, true_sigma*diag(length(y)))
+weighted_likelihoods_matrix <- calculate_weighted_likelihoods(y, X, theta_samples, true_sigma)
 
 vector_1 <- weighted_likelihoods_matrix
 dim(vector_1)
