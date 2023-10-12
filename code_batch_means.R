@@ -26,7 +26,11 @@ sigma = true_sigma*diag(length(y))
 
 # Function to calculate the inverse likelihood (1 / p(y|theta))
 calculate_inverse_likelihood <- function(y, X, true_theta, sigma) {
-  inverse_likelihood <- 1 / -dmvnorm(y, mean = X %*% true_theta, sigma = sigma,log = TRUE)
+  inverse_likelihood <- numeric()
+  for (i in 1:length(y)) {
+    inverse_likelihood[i] <- -(1 / dnorm(y[i], mean = X[i,] %*% true_theta, sd = sigma,log = TRUE))
+    
+  }
   return(inverse_likelihood)
 }
 calculate_inverse_likelihood(y,X,true_theta,true_sigma*diag(length(y)))
@@ -99,7 +103,7 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, sigma) {
   
     weighted_likelihoods <- matrix(0,num_samples,num_observations)
     weights <- matrix(0,num_samples,num_observations)
-    s =20
+    #s =20
     for (s in 1:num_samples) {
       weights[s,] <- calculate_weights(y, X, t(theta_samples[s,]), true_sigma)
       weighted_likelihoods[s,] <- -(dmvnorm((y), mean = X %*% (theta_samples[s, ]), sigma = sigma,log = TRUE)) + log(weights[s,])
@@ -121,7 +125,7 @@ dim(vector_1)
 library(mcmcse)
 library(coda)
 chain_1_cov <- mcse.multi(vector_1,method = "bm")$cov ## using batch means estimator
-
+num_observations <- length(y)
 vec_1_sum <- numeric()
 for (i in 1:(2*num_observations)) {
   vec_1_sum[i] <- sum(vector_1[,i])
