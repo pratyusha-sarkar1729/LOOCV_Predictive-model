@@ -5,14 +5,15 @@ library(coda)
 # Example:
 set.seed(10)
 N <- 50
-X <- matrix(rnorm(N * 25), ncol = 25)
-true_theta <- (rep(0.2, 25))
+p <- 5
+X <- matrix(rnorm(N * p), ncol = p)
+true_theta <- (rep(0.2, p))
 true_sigma <- 2
 y <- rnorm(N, as.vector(X %*% matrix(true_theta, ncol = 1)), true_sigma)
-theta_0 <- as.matrix(rep(2, 25))
-Sigma <- diag(25)
-num_samples <- 500
-initial_theta <- rep(0.1, 25)
+theta_0 <- as.matrix(rep(2, p))
+Sigma <- diag(p)
+num_samples <- 50000
+initial_theta <- rep(0.1, p)
 s.cand <- 0.08
 
 
@@ -78,7 +79,7 @@ theta_samples_from_log_q_mix_theta <- function(y, X, num_samples, theta_0, Sigma
     
     
     # Print the log ratio
-    cat("Step:", s, "Log Ratio:", log_ratio, "\n")
+   # cat("Step:", s, "Log Ratio:", log_ratio, "\n")
     
     if ((runif(1)) < log_ratio) 
     {
@@ -103,7 +104,7 @@ length(unique(theta_samples[,1])) / nrow(theta_samples)
 # Function to calculate weights for each data point
 calculate_weights <- function(y, X, true_theta, sigma) 
 {
-  inverse_likelihoods <- numeric(0)
+  inverse_likelihoods <- numeric(length = length(y))
   
   for(i in 1: length(y))
   {
@@ -120,7 +121,7 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, sigma)
   num_samples <- nrow(theta_samples)
   num_observations <- length(y)
   #i= 100
-  vector <- numeric()
+  #vector <- numeric()
   
   weighted_likelihoods <- matrix(0,num_samples,num_observations)
   weights <- matrix(0,num_samples,num_observations)
@@ -129,7 +130,7 @@ calculate_weighted_likelihoods <- function(y, X, theta_samples, sigma)
   for (s in 1:num_samples) 
   {
     weights[s,] <- calculate_weights(y, X, theta_samples[s,], true_sigma)
-    weighted_likelihoods[s,] <- (dmvnorm((y), mean = as.numeric(X %*% (theta_samples[s, ])), sigma = true_sigma*diag(length(y)))) %*% (weights[s,])
+    weighted_likelihoods[s,] <- (dnorm(y, mean = as.numeric(X %*% (theta_samples[s, ])), sd = sqrt(true_sigma))) * (weights[s,])
   }
   
   # Store the weighted_likelihoods for this observation in the matrix
@@ -145,17 +146,17 @@ weighted_likelihoods_matrix <- calculate_weighted_likelihoods(y, X, theta_sample
 vector_1 <- weighted_likelihoods_matrix
 dim(vector_1)
 
-chain_1_cov <- mcse.multi(vector_1,method = "bm")$cov ## using batch means estimator
+chain_1_cov <- mcse.multi(vector_1, r = 1)$cov ## using batch means estimator
 eigen(chain_1_cov)$values
 
 num_observations <- length(y)
 
-vec_1_sum <- numeric()
-for (i in 1:(2*num_observations)) 
-{
-  vec_1_sum[i] <- sum(vector_1[,i])
-}
-
+# vec_1_sum <- numeric()
+# for (i in 1:(2*num_observations)) 
+# {
+#   vec_1_sum[i] <- sum(vector_1[,i])
+# }
+vec_1_sum <- colMeans(vector_1)
 # 'delta_g_matrix' is your Δg(x) matrix
 calculate_delta_g_1_matrix <- function(x) 
 {
@@ -165,7 +166,7 @@ calculate_delta_g_1_matrix <- function(x)
   for (i in 1:n) 
   {
     delta_g_1_matrix[i, i] <- 1 / (x[i + n])
-    delta_g_1_matrix[i, i + n] <- x[i] / ( x[i + n])^2
+    delta_g_1_matrix[i, i + n] <- - x[i] / ( x[i + n])^2
   }
   
   return(delta_g_1_matrix)
@@ -232,3 +233,5 @@ calculate_delta_g_3_matrix <- function(x)
 chain_4_cov <-  calculate_delta_g_3_matrix(vector_3) %*%(chain_3_cov) %*% t(calculate_delta_g_3_matrix(vector_3))
 
 print(paste("Final estimate of Variance is: ",round(chain_4_cov,4)))
+
+sum(vector_3)
