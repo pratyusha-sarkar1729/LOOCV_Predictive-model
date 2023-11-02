@@ -1,4 +1,3 @@
-library(mvtnorm)
 
 # Function to calculate the posterior log probability p(theta|y)
 calculate_posterior_log <- function(y, X, true_theta, sigma, theta_0, Sigma) 
@@ -119,56 +118,6 @@ calculate_vector_2 <- function(x)
 }
 
 
-# Example:
-set.seed(10)
-N <- 50
-p = 15
-X <- matrix(rnorm(N * p), ncol = p)
-true_theta <- (rep(0.2, p))
-true_sigma <- 2
-y <- rnorm(N, as.vector(X %*% matrix(true_theta, ncol = 1)), true_sigma)
-theta_0 <- as.matrix(rep(2, p))
-Sigma <- diag(p)
-num_samples <- 1e5
-initial_theta <- rep(0.1, p)
-s.cand <- 0.04
-
-calculate_posterior_log(y,X,true_theta,true_sigma*diag(length(y)),theta_0,Sigma)
-
-calculate_inverse_likelihood(y,X,true_theta, true_sigma)
-
-q_mix_theta(y,X,true_theta,true_sigma,theta_0,Sigma)
-
-# Draw samples from the combined posterior
-theta_samples <- theta_samples_from_q_mix_theta (y, X, num_samples, initial_theta, Sigma, true_sigma, s.cand)
-#autocorr.plot(theta_samples)
-
-dim(theta_samples)
-length(unique(theta_samples[,1])) / nrow(theta_samples)
-# Assuming you have theta_samples matrix with num_samples rows and num_parameters columns
-
-# Example usage:
-# Assuming you have y, X, theta_samples, and true_sigma defined
-vector_1 <- calculate_weighted_likelihoods(y, X, theta_samples, true_sigma)
-
-dim(vector_1)
-
-num_observations <- length(y)
-vec_1_sum <-  colMeans(vector_1)
-dim(as.matrix(vec_1_sum))
-
-
-vector_2 <- calculate_vector_2(vec_1_sum)
-dim(vector_2)
-
-# Calculate the desired quantity (predictive distribution) for each data point
-mix = ((vector_2))
-
-##################################################################################
-##################################################################################
-##################################################################################
-
-
 # Compute p(y_i|y_(-i))
 compute_conditional_pdf_Y_i_given_Y_minus_i <- function(Y, X, Sigma_0, mu_0, sigma_0) 
 {
@@ -208,9 +157,114 @@ compute_conditional_pdf_Y_i_given_Y_minus_i <- function(Y, X, Sigma_0, mu_0, sig
 }
 
 
+# Example:
+set.seed(10)
+N <- 50
+p = 15
+X <- matrix(rnorm(N * p), ncol = p)
+true_theta <- (rep(0.2, p))
+true_sigma <- 2
+y <- rnorm(N, as.vector(X %*% matrix(true_theta, ncol = 1)), true_sigma)
+theta_0 <- as.matrix(rep(2, p))
+Sigma <- diag(p)
+num_samples <- 500
+initial_theta <- rep(0.1, p)
+s.cand <- 0.04
+
+calculate_posterior_log(y,X,true_theta,true_sigma*diag(length(y)),theta_0,Sigma)
+
+calculate_inverse_likelihood(y,X,true_theta, true_sigma)
+
+q_mix_theta(y,X,true_theta,true_sigma,theta_0,Sigma)
+
+# Draw samples from the combined posterior
+theta_samples <- theta_samples_from_q_mix_theta (y, X, num_samples, initial_theta, Sigma, true_sigma, s.cand)
+#autocorr.plot(theta_samples)
+
+dim(theta_samples)
+length(unique(theta_samples[,1])) / nrow(theta_samples)
+# Assuming you have theta_samples matrix with num_samples rows and num_parameters columns
+
+# Example usage:
+# Assuming you have y, X, theta_samples, and true_sigma defined
+vector_1 <- calculate_weighted_likelihoods(y, X, theta_samples, true_sigma)
+
+dim(vector_1)
+
+num_observations <- length(y)
+vec_1_sum <-  colMeans(vector_1)
+dim(as.matrix(vec_1_sum))
+
+
+vector_2 <- calculate_vector_2(vec_1_sum)
+dim(vector_2)
+
+# Calculate the desired quantity (predictive distribution) for each data point
+mix = ((vector_2))
+
+
 test <- compute_conditional_pdf_Y_i_given_Y_minus_i(y,X,Sigma,theta_0,true_sigma)
 original = (log(test))
 
 # Calculate the Mean Squared Error (MSE)
 mse <- mean((mix - original)^2)
 print(paste("MSE:", mse))
+
+
+######################################################
+#####################################################
+### mse calcultion for different values of p ##########
+######################################################
+
+calculate_MSE_for_different_p <- function(num_samples, p_values) {
+  mse_values <- numeric(length(p_values))
+  
+  for (i in 1:length(p_values)) {
+    set.seed(10)
+    N <- 50
+    p <- p_values[i]
+    X <- matrix(rnorm(N * p), ncol = p)
+    true_theta <- rep(0.2, p)
+    true_sigma <- 2
+    y <- rnorm(N, as.vector(X %*% matrix(true_theta, ncol = 1)), true_sigma)
+    theta_0 <- as.matrix(rep(2, p))
+    Sigma <- diag(p)
+    initial_theta <- rep(0.1, p)
+    s.cand <- 0.04
+    
+    calculate_posterior_log(y, X, true_theta, true_sigma * diag(length(y)), theta_0, Sigma)
+    calculate_inverse_likelihood(y, X, true_theta, true_sigma)
+    q_mix_theta(y, X, true_theta, true_sigma, theta_0, Sigma)
+    
+    # Draw samples from the combined posterior
+    theta_samples <- theta_samples_from_q_mix_theta(y, X, num_samples, initial_theta, Sigma, true_sigma, s.cand)
+    
+    num_observations <- length(y)
+    vec_1_sum <- colMeans(calculate_weighted_likelihoods(y, X, theta_samples, true_sigma))
+    vector_2 <- calculate_vector_2(vec_1_sum)
+    
+    # Calculate the desired quantity (predictive distribution) for each data point
+    mix <- exp(vector_2)
+    
+    test <- compute_conditional_pdf_Y_i_given_Y_minus_i(y, X, Sigma, theta_0, true_sigma)
+    original <- log(test)
+    
+    # Calculate the Mean Squared Error (MSE)
+    mse_values[i] <- mean((mix - original)^2)
+  }
+  
+  return(mse_values)
+}
+
+# Example usage
+num_samples <- 1e6
+p_values <- c(5,10,15,20,25,30)  # Add the desired values of "p" here
+mse_results <- calculate_MSE_for_different_p(num_samples, p_values)
+print(mse_results)
+df <- data.frame(p = p_values,mse = mse_results)
+# Assuming df is your data frame with "p" and "mse" columns
+ggplot(df, aes(x = p, y = mse)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "p ", y = "MSE") +
+  ggtitle("MSE vs. p ")
