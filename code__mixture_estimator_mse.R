@@ -253,18 +253,69 @@ calculate_MSE_for_different_p <- function(num_samples, p_values) {
     mse_values[i] <- mean((mix - original)^2)
   }
   
-  return(mse_values)
+  return(data.frame(p = p_values, mse = mse_values))
 }
 
 # Example usage
-num_samples <- 1e6
+num_samples <- 1e4
 p_values <- c(5,10,15,20,25,30)  # Add the desired values of "p" here
-mse_results <- calculate_MSE_for_different_p(num_samples, p_values)
-print(mse_results)
-df <- data.frame(p = p_values,mse = mse_results)
+mse_results_mix <- calculate_MSE_for_different_p(num_samples, p_values)
+
 # Assuming df is your data frame with "p" and "mse" columns
-ggplot(df, aes(x = p, y = mse)) +
+ggplot(mse_results_mix, aes(x = p, y = mse)) +
   geom_line() +
   geom_point() +
   labs(x = "p ", y = "MSE") +
-  ggtitle("MSE vs. p ")
+  ggtitle("MSE vs. p for bronze ")
+
+
+calculate_MSE_for_different_N <- function(N_values, p) {
+      mse_values <- numeric(length(N_values))
+      for (i in 1:length(N_values)) {
+          N <- 50
+                          
+          set.seed(10)
+          X <- matrix(rnorm(N * p), ncol = p)
+          true_theta <- rep(0.2, p)
+          true_sigma <- 2
+          y <- rnorm(N, as.vector(X %*% matrix(true_theta, ncol = 1)), true_sigma)
+          theta_0 <- as.matrix(rep(2, p))
+          Sigma <- diag(p)
+          initial_theta <- rep(0.1, p)
+          s.cand <- 0.04
+                          
+          calculate_posterior_log(y, X, true_theta, true_sigma * diag(length(y)), theta_0, Sigma)
+          calculate_inverse_likelihood(y, X, true_theta, true_sigma)
+          q_mix_theta(y, X, true_theta, true_sigma, theta_0, Sigma)
+                          
+        # Draw samples from the combined posterior
+        theta_samples <- theta_samples_from_q_mix_theta(y, X, N_values[i], initial_theta, Sigma, true_sigma, s.cand)
+                          
+        num_observations <- length(y)
+        vec_1_sum <- colMeans(calculate_weighted_likelihoods(y, X, theta_samples, true_sigma))
+        vector_2 <- calculate_vector_2(vec_1_sum)
+                          
+        # Calculate the desired quantity (predictive distribution) for each data point
+        mix <- exp(vector_2)
+                          
+        test <- compute_conditional_pdf_Y_i_given_Y_minus_i(y, X, Sigma, theta_0, true_sigma)
+        original <- log(test)
+                          
+        # Calculate the Mean Squared Error (MSE)
+        mse_values[i] <- mean((mix - original)^2)
+    }
+                        
+      return(data.frame(N = N_values, mse = mse_values))
+}
+
+# Example usage:
+N_values <- c(1e2,1e3,5000,1e4)  # Define the values of N for which you want to calculate MSE
+p <- 25  # Fixed value of p
+mse_result_df_mix_diff_N <- calculate_MSE_for_different_N(N_values, p)
+mse_f <- c(0.882611,0.707480, 0.665674,0.4974378)
+mse_df <- data.frame(N = N_values,mse = mse_f )
+mix_plot <- ggplot(mse_result_df_mix_diff_N, aes(x = N, y = mse)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "N ", y = "MSE") +
+  ggtitle("MSE vs. N for mixture for different N ")
